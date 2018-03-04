@@ -1,24 +1,18 @@
 package com.lucene.proj;
 
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Date;
-import java.util.HashMap;
-
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
@@ -27,9 +21,10 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.similarities.*;
+import org.apache.lucene.search.similarities.BM25Similarity;
+import org.apache.lucene.search.similarities.ClassicSimilarity;
+import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
-
 
 public class SearchFiles {
 
@@ -44,12 +39,13 @@ public class SearchFiles {
 			System.exit(0);
 	}
 
-  String index = "Z:/SEM 2/Info Retrieval/lucene-7.2.1/ProductIndex/";
-  String field = "contents";
+  String index = "Z:/SEM 2/Info Retrieval/lucene/ProductIndex/";
+  String field = "Content";
 
-  String queryFile = "Z:/SEM 2/Info Retrieval/lucene-7.2.1/CranFiles/cran.qry";
-  String bestMatch = "bm25";  //for score
+  String queryFile = "Z:/SEM 2/Info Retrieval/lucene/CranFiles/cran.qry";
+  String simScore = "bm25";  //for score
  
+  /*
   String queries = null;
   int repeat = 0;
   boolean raw = false;
@@ -83,149 +79,125 @@ public class SearchFiles {
       i++;
     }
   }
+  */
   
   IndexReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(index)));
   IndexSearcher searcher = new IndexSearcher(reader);
-  Analyzer analyzer = new StandardAnalyzer();
+ // Analyzer analyzer = new StandardAnalyzer();
   
   searcher.setSimilarity(new BM25Similarity(0.2F, 0.5F));
+  Similarity simi= new ClassicSimilarity();
+  searcher.setSimilarity(simi);
+  simScore = "TF-IDF";
+  System.out.println(reader.getDocCount(field));
+
   
   BufferedReader queryBuffer = new BufferedReader(new FileReader(new File(queryFile)));
 
-  BufferedReader in = null;
+/*  BufferedReader in = null;
   if (queries != null) {
     in = Files.newBufferedReader(Paths.get(queries), StandardCharsets.UTF_8);
   } else {
     in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
   }
+  
   QueryParser parser = new QueryParser(field, analyzer);
   while (true) {
-    if (queries == null && queryString == null) {                        // prompt the user
-      System.out.println("Enter query: ");
-    }
+*/   
+  	int counter=0;
+//	Query query;
+	String line;
+	String queryText="";
+//	String[] pair= {};
+	boolean firstQuery=true;
 
-    String line = queryString != null ? queryString : in.readLine();
+while ((line = queryBuffer.readLine()) != null) {
 
-    if (line == null || line.length() == -1) {
-      break;
-    }
+	//System.out.println(line);
+	if (line.startsWith(".I")) {
+		if (firstQuery==true) {
+			//pair = line.split(" ", 2);
+			counter++;
+			firstQuery=false;
+			continue;
+		}
+		//query= parser.parse(queryText);
+		//System.out.println(counter);
+		//System.out.println(queryText);
+		//pair = line.split(" ", 2);
+		
+		doPagingSearch(queryBuffer, searcher, String.valueOf(counter), queryText, simScore);
+		counter++;
+		continue;
+	}
+	else if (line.startsWith(".W")) {
+		queryText="";
+		continue;
+	}				
+	queryText = queryText + line;
+}
 
-  line = line.trim();
-    if (line.length() == 0) {
-      break;
-    }
-    
-    Query query = parser.parse(line);
-    System.out.println("Searching for: " + query.toString(field));
-          
-    if (repeat > 0) {                           // repeat & time as benchmark
-      Date start = new Date();
-      for (int i = 0; i < repeat; i++) {
-        searcher.search(query, 100);
-      }
-      Date end = new Date();
-      System.out.println("Time: "+(end.getTime()-start.getTime())+"ms");
-    }
+//query= parser.parse(queryText);
+doPagingSearch(queryBuffer, searcher, String.valueOf(counter), queryText, simScore);
 
-    doPagingSearch(in, searcher, query, hitsPerPage, raw, queries == null && queryString == null);
-
-    if (queryString != null) {
-      break;
-    }
-  }
-  reader.close();
+queryBuffer.close();
 }
 
  
-public static void doPagingSearch(BufferedReader in, IndexSearcher searcher, Query query, 
-                                   int hitsPerPage, boolean raw, boolean interactive) throws IOException {
+public static void doPagingSearch(BufferedReader in, IndexSearcher searcher, String queryID, String queryText, String simScore) throws IOException, ParseException 
+{
+ 
+	Analyzer analyzer = new StandardAnalyzer();
+	QueryParser p1 = new QueryParser("Title", analyzer);
+	QueryParser p2 = new QueryParser("Author", analyzer);
+	QueryParser p3 = new QueryParser("Content", analyzer);
+	    
+	Query q1 = p1.parse(queryText);
+	Query q2 = p2.parse(queryText);
+	Query q3 = p3.parse(queryText);
+	
+    Query boostQ1 = new BoostQuery(q1, (float) 2);
+    Query boostQ2 = new BoostQuery(q2, (float) 2.5);
+    Query boostQ3 = new BoostQuery(q3, (float) 0.5);
 
-  // Collect enough docs to show 5 pages
-  TopDocs results = searcher.search(query, 5 * hitsPerPage);
+    BooleanQuery.Builder booleanQuery = new BooleanQuery.Builder();
+    booleanQuery.add(boostQ1, Occur.SHOULD);
+    booleanQuery.add(boostQ2, Occur.SHOULD);
+    booleanQuery.add(boostQ3, Occur.SHOULD);
+	
+    //PrintStream out = new PrintStream(new FileOutputStream("", true));
+	
+  TopDocs results = searcher.search(booleanQuery.build(), 20);
   ScoreDoc[] hits = results.scoreDocs;
   
-  int numTotalHits = Math.toIntExact(results.totalHits);
-  System.out.println(numTotalHits + " total matching documents");
+  int TotalHits = Math.toIntExact(results.totalHits);
+  int count;
+  int start=0;
+  int end = Math.min(TotalHits,20 );
+  
+  System.out.println(TotalHits + " total matching documents");
+  
+  for (int i = start; i < end; i++) {
+		Document doc = searcher.doc(hits[i].doc);
+		
+		System.out.println("Doc: "+doc);
+		String docNo = doc.get("path");
+		//docno.substring(15, 20);
+		count=0;
+		
+//		Z:\SEM 2\Info Retrieval\lucene-7.2.1\ProductData\1343.txt 19 5.453277 TF-IDF
+		
+		while(docNo.charAt(count)!='.') {
+				count++;
+		}
+		
+		docNo= docNo.substring(43, count);
+	//	System.out.println("DOC NO "+docNo);
+		System.out.println(queryID+" Q0"+docNo+" "+i+" "+"Score: "+hits[i].score+" "+simScore);
+		
+		
+		}
+	}	
 
-  int start = 0;
-  int end = Math.min(numTotalHits, hitsPerPage);
-      
- while (true) {
-   if (end > hits.length) {
-      System.out.println("Only results 1 - " + hits.length +" of " + numTotalHits + " total matching documents collected.");
-      System.out.println("Collect more (y/n) ?");
-     String line = in.readLine();
-      if (line.length() == 0 || line.charAt(0) == 'n') {
-        break;
-      }
-
-      hits = searcher.search(query, numTotalHits).scoreDocs;
-    }
-    
-    end = Math.min(hits.length, start + hitsPerPage);
-    
-    for (int i = start; i < end; i++) {
-      if (raw) {                              // output raw format
-        System.out.println("doc="+hits[i].doc+" score="+hits[i].score);
-        continue;
-     }
-
-      Document doc = searcher.doc(hits[i].doc);
-      String path = doc.get("path");
-      if (path != null) {
-       System.out.println((i+1) + ". " + path);
-        String title = doc.get("title");
-        if (title != null) {
-          System.out.println("   Title: " + doc.get("title"));
-      }
-     } else {
-        System.out.println((i+1) + ". " + "No path for this document");
-      }
-                
-    }
-
-    if (!interactive || end == 0) {
-      break;
-    }
-
-    if (numTotalHits >= end) {
-      boolean quit = false;
-      while (true) {
-       System.out.print("Press ");
-       if (start - hitsPerPage >= 0) {
-          System.out.print("(p)revious page, ");  
-       }
-        if (start + hitsPerPage < numTotalHits) {
-         System.out.print("(n)ext page, ");
-        }
-        System.out.println("(q)uit or enter number to jump to a page.");
+}
         
-        String line = in.readLine();
-        if (line.length() == 0 || line.charAt(0)=='q') {
-          quit = true;
-          break;
-        }
-       if (line.charAt(0) == 'p') {
-          start = Math.max(0, start - hitsPerPage);
-          break;
-        } else if (line.charAt(0) == 'n') {
-          if (start + hitsPerPage < numTotalHits) {
-            start+=hitsPerPage;
-          }
-         break;
-       } else {
-          int page = Integer.parseInt(line);
-          if ((page - 1) * hitsPerPage < numTotalHits) {
-            start = (page - 1) * hitsPerPage;
-            break;
-          } else {
-            System.out.println("No such page");
-          }
-        }
-      }
-      if (quit) break;
-      end = Math.min(numTotalHits, start + hitsPerPage);
-    }
-  }
-}
-}
