@@ -28,8 +28,8 @@ public class SplitterFiles {
 
 	public static void main(String[] args) {
 		
-		String inputDirectory = "Z:/SEM 2/Info Retrieval/lucene-7.2.1/CranFiles/";
-		Splitter documents_splitter = new Splitter(inputDirectory + "cran.all.1400", "Z:/SEM 2/Info Retrieval/lucene-7.2.1/ProductData/");
+		String inputDirectory = "Z:/SEM 2/Info Retrieval/lucene/CranFiles/";
+		Splitter documents_splitter = new Splitter(inputDirectory + "cran.all.1400", "Z:/SEM 2/Info Retrieval/lucene/ProductData/");
 		documents_splitter.start();
 		
 		try {
