@@ -27,6 +27,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
+
 /** Index all text files under a directory.
 * <p>
 * This is a command-line application demonstrating simple Lucene indexing.
@@ -44,8 +45,8 @@ public static void main(String[] args) {
                + "This indexes the documents in DOCS_PATH, creating a Lucene index"
                + "in INDEX_PATH that can be searched with SearchFiles";
   
-  String indexPath = "Z:/SEM 2/Info Retrieval/lucene-7.2.1/ProductIndex";
-  String docsPath = "Z:/SEM 2/Info Retrieval/lucene-7.2.1/ProductData";
+  String indexPath = "Z:/SEM 2/Info Retrieval/lucene/ProductIndex/";
+  String docsPath = "Z:/SEM 2/Info Retrieval/lucene/ProductData/";
   boolean create = true;	
   
   for(int i=0;i<args.length;i++) {
@@ -247,7 +248,5 @@ static void indexDoc(IndexWriter writer, Path file, long lastModified) throws IO
       System.out.println("updating " + file);
       writer.updateDocument(new Term("path", file.toString()), doc);
     	}
-	}
 }
- 
-
+}
